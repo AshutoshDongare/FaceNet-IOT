@@ -1,4 +1,5 @@
-"""Ashutosh IOT FACE recognition"""
+# IOT FACE recognition based on Facenet 
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -22,7 +23,6 @@ from time import sleep
 def main(args):
     #Load MTCNN model for detecting and aligning Faces in the Captured Photos
     with tf.Graph().as_default():
-        #args.gpu_memory_fraction
         gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=1)
         sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options, log_device_placement=False))
         with sess.as_default():
@@ -33,20 +33,20 @@ def main(args):
     factor = 0.709 # scale factor
 
     nrof_successfully_aligned = 0
-
+    
+    # Save faces files locally just to varify. You may want to remove this once your system is set up.
     output_filename = 'd:\PhotoCaptured.png'
-
 
     with tf.Graph().as_default():
         with tf.Session() as sess:
             # args.seed defaulted to 666
             np.random.seed(seed=666)
         
-        # Ashutosh Getting the Load out of the loop
-        # Load the model
+        # Load the model once
         print('Loading feature extraction model')
-        # hardcoded model arg to ./models/20170512-110547.pb
-        facenet.load_model('D:/Python/facenet-master/models/20170512-110547.pb')
+        
+        # Use your path where you have saved pretrained facenet model
+        facenet.load_model('./models/20170512-110547.pb')
         
         # Get input and output tensors
         images_placeholder = tf.get_default_graph().get_tensor_by_name("input:0")
@@ -54,26 +54,25 @@ def main(args):
         phase_train_placeholder = tf.get_default_graph().get_tensor_by_name("phase_train:0")
         embedding_size = embeddings.get_shape()[1]
 
-        # classifier_filename_exp = os.path.expanduser(args.classifier_filename)
-        classifier_filename_exp = os.path.expanduser('D:/Python/facenet-master/models/my_classifier.pkl')
+        # your custom classifier trained the last layer with your own image database. Please refer to Facenet repo for training custom classifier
+        classifier_filename_exp = os.path.expanduser('./models/my_classifier.pkl')
 
         # Classify images
-
         print('Testing classifier')
         with open(classifier_filename_exp, 'rb') as infile:
             (model, class_names) = pickle.load(infile)
 
         print('Loaded classifier model from file "%s"' % classifier_filename_exp)
+
     #Start Video Capture
     video_capture = cv2.VideoCapture(0)
     
+    #All the pre-loading is done. Now loop through capturing photos and recognizing faces in the frames
     while True:
     
         try:
-
             ret, frame = video_capture.read()
             img = frame
-
 
         except (IOError, ValueError, IndexError) as e:
             print("Error")
@@ -124,6 +123,7 @@ def main(args):
                     scaled = misc.imresize(cropped, (160, 160), interp='bilinear')
                     nrof_successfully_aligned += 1
                     filename_base, file_extension = os.path.splitext(output_filename)
+                    
                     #if args.detect_multiple_faces: #Try keeping it in nparray insted of writing
                     output_filename_n = "{}_{}{}".format(filename_base, i, file_extension)
                     #else:
@@ -136,13 +136,11 @@ def main(args):
                 print('No Image or - Unable to align')
                 continue
               
-            ''' Ashutosh - Classifier Code
-            '''
+            #Invoke Classifier Code
         
             # Run forward pass to calculate embeddings
             print('Calculating features for images')
-            #nrof_images = len(paths) ********************Hardcoded 1 for now but it will be multiple
-            #This need to be corrected to Number of Faces in the image
+
             nrof_images = nrof_faces
             nrof_batches_per_epoch = int(math.ceil(1.0 * nrof_images / 1000))
             emb_array = np.zeros((nrof_images, embedding_size))
@@ -151,7 +149,7 @@ def main(args):
                 start_index = i * 1000
                 #end_index = min((i + 1) * args.batch_size, nrof_images)
                 end_index = min((i + 1) * 1000, nrof_images)
-                #images = facenet.load_data(paths_batch, False, False, args.image_size)
+                 
                 images = Face_load_data(face_list, False, False, 160)
                 
                 feed_dict = {images_placeholder: images, phase_train_placeholder: False}
@@ -162,6 +160,7 @@ def main(args):
             best_class_indices = np.argmax(predictions, axis=1)
             best_class_probabilities = predictions[np.arange(len(best_class_indices)), best_class_indices]
             
+            #Print Face recognization result for each Face in the Frame
             for i in range(len(best_class_indices)):
                 print('%4d  %s: %.3f' % (i, class_names[best_class_indices[i]], best_class_probabilities[i]))
                                 
